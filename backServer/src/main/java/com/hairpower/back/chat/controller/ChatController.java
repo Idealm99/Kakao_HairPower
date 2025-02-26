@@ -1,12 +1,9 @@
 package com.hairpower.back.chat.controller;
 
 import com.hairpower.back.ai.service.AiService;
-import com.hairpower.back.chat.dto.ChatRequestDto;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
 
 @RestController
 @RequestMapping("/chat")
@@ -14,31 +11,21 @@ import java.util.List;
 public class ChatController {
     private final AiService aiService;
 
-    // AI 분석 시작
-    @PostMapping("/start-analysis/{userId}")
-    public ResponseEntity<String> startAiAnalysis(@PathVariable Long userId) {
-        String response = aiService.uploadPhotoToAI(userId);
-        return ResponseEntity.ok(response);
+    // 1. AI 얼굴 분석 요청
+    @GetMapping("/select-story-image/{userId}")
+    public ResponseEntity<String> getUserFeatures(@PathVariable Long userId) {
+        return ResponseEntity.ok(String.join(", ", aiService.getUserFeatures(userId)));
     }
 
-    // AI로부터 사용자 특징 받아서 저장
-    @GetMapping("/fetch-user-features/{userId}")
-    public ResponseEntity<List<String>> fetchUserFeatures(@PathVariable Long userId) {
-        List<String> features = aiService.fetchUserFeaturesFromAI(userId);
-        return ResponseEntity.ok(features);
-    }
-
-    // AI 분석 결과 확인 (DB 저장 없이 프론트에 바로 반환)
-    @GetMapping("/get-ai-result/{userId}")
+    // 2. AI 분석 결과 가져오기
+    @GetMapping("/get-story-result/{userId}")
     public ResponseEntity<String> getAiResult(@PathVariable Long userId) {
-        String response = aiService.getStoryResult(userId);
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(aiService.getStoryResult(userId));
     }
 
-    // 사용자 질문 → AI 질문 → 응답 반환
-    @PostMapping("/ask-ai")
-    public ResponseEntity<String> askAi(@RequestBody ChatRequestDto requestDto) {
-        String response = aiService.chatbotRespond(requestDto.getUserId(), requestDto.getMessage());
-        return ResponseEntity.ok(response);
+    // 3. 사용자 질문 응답
+    @PostMapping("/chatbot/respond")
+    public ResponseEntity<String> askAi(@RequestParam Long userId, @RequestParam String message) {
+        return ResponseEntity.ok(aiService.chatbotRespond(userId, message));
     }
 }
