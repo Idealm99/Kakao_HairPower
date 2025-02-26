@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.Optional;
 
 @Service
@@ -17,16 +18,19 @@ public class UserService {
     private final S3Service s3Service;
 
     public User createUser(String gender, MultipartFile image) throws IOException {
-        User user = new User(gender);
-
-        // S3에 이미지 업로드 후 URL 저장
         String imageUrl = s3Service.uploadFile(image);
-        user.setImageUrl(imageUrl);
-
+        User user = User.builder()
+                .gender(gender)
+                .imageUrl(imageUrl)
+                .build();
         return userRepository.save(user);
     }
 
-    public Optional<User> getUserById(String userId) {
-        return userRepository.findById(userId);
+    public void updateUserFeatures(Long userId, List<String> features) {
+        Optional<User> user = userRepository.findByUserId(userId);
+        user.ifPresent(u -> {
+            u.setUserFeatures(features);
+            userRepository.save(u);
+        });
     }
 }
