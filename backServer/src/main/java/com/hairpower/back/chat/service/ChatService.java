@@ -3,10 +3,13 @@ package com.hairpower.back.chat.service;
 import com.hairpower.back.ai.service.AiService;
 import com.hairpower.back.chat.dto.ChatRequestDto;
 import com.hairpower.back.chat.dto.ChatResponseDto;
+import com.hairpower.back.chat.model.Chat;
+import com.hairpower.back.chat.repository.ChatRepository;
 import com.hairpower.back.user.model.User;
 import com.hairpower.back.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Optional;
 
@@ -15,11 +18,11 @@ import java.util.Optional;
 public class ChatService {
     private final AiService aiService;
     private final UserRepository userRepository;
+    private final ChatRepository chatRepository;
 
-    // 사용자 질문을 AI에 전달하고 응답을 반환하는 메서드
+    @Transactional
     public ChatResponseDto chatWithAI(ChatRequestDto requestDto) {
-        Long userId;  // userId를 Long 타입으로 변환
-
+        Long userId;
         try {
             userId = Long.parseLong(requestDto.getUserId());
         } catch (NumberFormatException e) {
@@ -37,9 +40,13 @@ public class ChatService {
         User user = userOptional.get();
 
         // AI와 통신하여 응답 받기
-        String aiResponse = aiService.chatbotRespond(userId, message);
+        String aiResponse = aiService.chatbotRespond(userId , message);
 
-        // AI 응답을 DTO로 변환하여 반환
+        // 채팅 로그 저장
+        Chat chat = new Chat();
+        chat.setUser(user);
+        chatRepository.save(chat);
+
         return new ChatResponseDto(userId.toString(), aiResponse);
     }
 }

@@ -17,20 +17,29 @@ public class UserService {
     private final UserRepository userRepository;
     private final S3Service s3Service;
 
+    // ✅ 사용자 ID로 유저 조회 메서드 추가
+    public Optional<User> findUserById(Long userId) {
+        return userRepository.findById(userId);
+    }
+
+    // ✅ 사용자 생성 (이미지 업로드 후 DB 저장)
     public User createUser(String gender, MultipartFile image) throws IOException {
         String imageUrl = s3Service.uploadFile(image);
-        User user = User.builder()
-                .gender(gender)
-                .imageUrl(imageUrl)
-                .build();
+
+        User user = new User();
+        user.setGender(gender);
+        user.setImageUrl(imageUrl);
+
         return userRepository.save(user);
     }
 
+    // ✅ AI 분석 결과 저장
     public void updateUserFeatures(Long userId, List<String> features) {
-        Optional<User> user = userRepository.findByUserId(userId);
-        user.ifPresent(u -> {
-            u.setUserFeatures(features);
-            userRepository.save(u);
-        });
+        Optional<User> userOptional = userRepository.findById(userId);
+        if (userOptional.isPresent()) {
+            User user = userOptional.get();
+            user.setUserFeatures(features);
+            userRepository.save(user);
+        }
     }
 }
