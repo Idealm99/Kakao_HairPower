@@ -1,7 +1,7 @@
 package com.hairpower.back.chat.controller;
 
 import com.hairpower.back.chat.dto.ChatRequestDto;
-import com.hairpower.back.user.service.UserService;
+import com.hairpower.back.ai.service.AiService; // ✅ AiService 추가
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -10,12 +10,12 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/chat")
 @RequiredArgsConstructor
 public class ChatController {
-    private final UserService userService;
+    private final AiService aiService; // ✅ UserService → AiService로 변경
 
     // ✅ AI 분석 시작 (기본값 적용)
     @PostMapping("/start-analysis/{userId}")
-    public ResponseEntity<String> startAiAnalysis(@PathVariable Long userId) {
-        userService.updateUserFeaturesFromAI(userId);
+    public ResponseEntity<String> startAiAnalysis(@PathVariable String userId) {
+        aiService.fetchUserFeaturesFromAI(userId); // ✅ AiService에서 직접 호출
         return ResponseEntity.ok("AI 분석 완료 및 userFeatures 저장됨.");
     }
 
