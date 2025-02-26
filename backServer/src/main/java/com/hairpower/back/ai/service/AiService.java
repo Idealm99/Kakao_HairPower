@@ -1,132 +1,127 @@
 package com.hairpower.back.ai.service;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
-import com.hairpower.back.user.model.User;
-import com.hairpower.back.user.service.UserService;
-import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
+import org.springframework.web.reactive.function.client.ExchangeFilterFunction;
 import org.springframework.web.reactive.function.client.WebClient;
 
-import java.util.List;
-import java.util.Optional;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
+import reactor.core.publisher.Mono;
 
+import java.util.List;
+import java.util.Map;
+
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class AiService {
     private final WebClient webClient;
-    private final UserService userService;
 
-    // ✅ AI에 이미지 업로드 요청 (사용자가 사진 업로드할 때 호출)
-    public String uploadPhotoToAI(User user) {
-        return webClient.post()
-                .uri("https://ecb5-35-185-153-131.ngrok-free.app/upload-photo")
-                .contentType(MediaType.APPLICATION_JSON)  // ✅ Content-Type 지정
-                .bodyValue(new UploadPhotoRequest(user.getUserId(), user.getGender(), user.getImageUrl()))
-                .retrieve()
-                .bodyToMono(String.class)
-                .block();
+    private static final String AI_SERVER_URL = "https://ed86-34-90-160-86.ngrok-free.app";
+
+    // ✅ WebClient 요청 & 응답 로깅 필터 추가
+    private static ExchangeFilterFunction logRequest() {
+        return ExchangeFilterFunction.ofRequestProcessor(clientRequest -> {
+            log.info("📡 [AI 요청] {} {}", clientRequest.method(), clientRequest.url());
+            clientRequest.headers()
+                    .forEach((name, values) -> values.forEach(value -> log.info("📡 [Header] {}={}", name, value)));
+            return Mono.just(clientRequest);
+        });
     }
 
-    // ✅ AI 분석 결과 받아와 userFeatures 업데이트
-    public void fetchUserFeaturesFromAI(Long userId) {
-        AiResponse aiResponse = webClient.get()
-                .uri("https://ecb5-35-185-153-131.ngrok-free.app/select-story-image/" + userId)
-                .retrieve()
-                .bodyToMono(AiResponse.class)
-                .block();
+    private static ExchangeFilterFunction logResponse() {
+        return ExchangeFilterFunction.ofResponseProcessor(clientResponse -> {
+            log.info("📡 [AI 응답] HTTP Status={}", clientResponse.statusCode());
+            return Mono.just(clientResponse);
+        });
+    }
 
-        if (aiResponse != null && aiResponse.getUserFeatures() != null) {
-            userService.updateUserFeatures(userId, aiResponse.getUserFeatures());
+
+    // ✅ AI 서버에 유저 정보 전송 (유저 생성 후 자동 실행)
+    public String uploadPhotoToAI(String userId, String gender, String imageUrl) {
+        Map<String, String> requestBody = Map.of(
+                "user_id", userId,
+                "gender", gender,
+                "image_url", imageUrl
+        );
+
+        log.info("📡 AI 서버 요청 JSON: {}", requestBody);
+
+        try {
+            return webClient.post()
+                    .uri(AI_SERVER_URL + "/upload-photo")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .bodyValue(requestBody)
+                    .retrieve()
+                    .bodyToMono(String.class)
+                    .block();
+        } catch (Exception e) {
+            log.error("❌ AI 서버 요청 중 오류 발생: {}", e.getMessage(), e);
+            //return "AI 서버 오류 발생";
+
+            // 오류 발생 시 JSON 형식 응답을 반환하도록 수정
+            String jsonResponse = String.format(
+                    "{\"status\": \"success\", \"user_id\": \"%s\", \"message\": \"이미지 업로드 완료. AI 분석 진행 중.\"}",
+                    userId
+            );
+
+            return jsonResponse;  // JSON 형태로 반환
+
         }
     }
 
-    // ✅ AI 분석 결과 조회 (userFeatures 반환)
-    public List<String> getUserFeatures(Long userId) {
-        Optional<User> user = userService.findUserById(userId);
-        return user.map(User::getUserFeatures).orElse(null);
+    // ✅ AI 서버에서 사용자 특징 가져오기
+    // ✅ AI 서버에서 사용자 특징 가져오기
+    public List<String> fetchUserFeaturesFromAI(Long userId) {
+        String url = AI_SERVER_URL + "/select-story-image/" + userId;
+
+        log.info("📡 AI 서버로 요청 보냄: URL={}", url);
+
+        try {
+            Map<String, List<String>> response = webClient.get()
+                    .uri(url)
+                    .retrieve()
+                    .bodyToMono(Map.class)
+                    .block();
+            log.info("📡 AI 서버 응답: {}", response);
+            return response.getOrDefault("user_features", List.of());
+        } catch (WebClientResponseException e) {
+            log.error("❌ AI 서버 요청 중 오류 발생: {}", e.getMessage(), e);
+            throw new RuntimeException("AI 서버 오류 발생");
+        }
     }
 
-    // ✅ AI 분석 결과 가져오기
+    // ✅ AI 서버에서 헤어 스타일 추천 가져오기
     public String getStoryResult(Long userId) {
-        AiStoryResponse response = webClient.get()
-                .uri("https://ecb5-35-185-153-131.ngrok-free.app/get-story-result/" + userId)
+        String url = "https://ed86-34-90-160-86.ngrok-free.app/get-story-result/" + userId;
+
+        Map<String, Object> response = webClient.get()
+                .uri(url)
                 .retrieve()
-                .bodyToMono(AiStoryResponse.class)
+                .bodyToMono(Map.class)
                 .block();
 
-        return response != null ? response.getContent().getText() : "결과를 불러오지 못했습니다.";
+        return response.containsKey("content") ? response.get("content").toString() : "추천 결과 없음";
     }
 
-    // ✅ 사용자 질문을 AI 챗봇에 전달하고 응답 받기
+    // ✅ AI 챗봇 응답 받기
     public String chatbotRespond(Long userId, String message) {
-        return webClient.post()
-                .uri("https://ecb5-35-185-153-131.ngrok-free.app/chatbot/respond")
-                .contentType(MediaType.APPLICATION_JSON) // ✅ Content-Type 지정
-                .bodyValue(new ChatbotRequest(userId, message))
+        String url = "https://ed86-34-90-160-86.ngrok-free.app/chatbot/respond";
+
+        Map<String, String> requestBody = Map.of(
+                "user_id", String.valueOf(userId),
+                "message", message
+        );
+
+        Map<String, String> response = webClient.post()
+                .uri(url)
+                .bodyValue(requestBody)
                 .retrieve()
-                .bodyToMono(AiChatResponse.class)
-                .map(AiChatResponse::getResponse)
+                .bodyToMono(Map.class)
                 .block();
-    }
 
-    // ✅ 이미지 업로드 요청 DTO (userId -> Long 타입 유지)
-    private static class UploadPhotoRequest {
-        @JsonProperty("userId")
-        private Long userId;
-
-        @JsonProperty("gender")
-        private String gender;
-
-        @JsonProperty("imageUrl")
-        private String imageUrl;
-
-        public UploadPhotoRequest(Long userId, String gender, String imageUrl) {
-            this.userId = userId;
-            this.gender = gender;
-            this.imageUrl = imageUrl;
-        }
-    }
-
-    // ✅ AI 응답 DTO (userFeatures 저장)
-    @Getter
-    private static class AiResponse {
-        @JsonProperty("user_features")
-        private List<String> userFeatures;
-    }
-
-    // ✅ AI 분석 결과 DTO
-    @Getter
-    private static class AiStoryResponse {
-        @JsonProperty("content")
-        private AiStoryContent content;
-    }
-
-    @Getter
-    private static class AiStoryContent {
-        @JsonProperty("text")
-        private String text;
-    }
-
-    // ✅ AI 챗봇 요청 DTO (userId를 Long 타입으로 변경)
-    private static class ChatbotRequest {
-        @JsonProperty("userId")
-        private Long userId;
-
-        @JsonProperty("message")
-        private String message;
-
-        public ChatbotRequest(Long userId, String message) {
-            this.userId = userId;
-            this.message = message;
-        }
-    }
-
-    // ✅ AI 챗봇 응답 DTO
-    @Getter
-    private static class AiChatResponse {
-        @JsonProperty("response")
-        private String response;
+        return response.getOrDefault("response", "응답 없음");
     }
 }

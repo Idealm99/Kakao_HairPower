@@ -1,25 +1,34 @@
 package com.hairpower.back.user.model;
 
 import jakarta.persistence.*;
-import lombok.*;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 
+import java.util.ArrayList;
 import java.util.List;
 
 @Entity
 @Getter
 @Setter
 @NoArgsConstructor
-@AllArgsConstructor
-@Builder
 public class User {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long userId;
 
     private String gender;
+    private String imageUrl;
 
-    private String imageUrl; // S3 이미지 URL
-
+    // ✅ 변경: 불변 리스트 -> 변경 가능한 리스트(ArrayList)
     @ElementCollection
-    private List<String> userFeatures; // AI 얼굴 분석 결과 저장
+    @CollectionTable(name = "user_features", joinColumns = @JoinColumn(name = "user_id"))
+    @Column(name = "feature")
+    private List<String> userFeatures = new ArrayList<>();
+
+    public void setUserFeatures(List<String> features) {
+        this.userFeatures.clear();  // 기존 값 제거
+        this.userFeatures.addAll(features);  // 새 값 추가
+    }
+
 }
