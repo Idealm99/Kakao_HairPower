@@ -22,7 +22,7 @@ public class AiService {
     private final WebClient webClient;
     private final UserRepository userRepository; // ✅ 유저 DB 업데이트를 위한 Repository 추가
 
-    private static final String AI_SERVER_URL = "https://ed86-34-90-160-86.ngrok-free.app";
+    private static final String AI_SERVER_URL = "https://14d7-34-90-160-86.ngrok-free.app/";
 
     // ✅ WebClient 요청 & 응답 로깅 필터 추가
     private static ExchangeFilterFunction logRequest() {

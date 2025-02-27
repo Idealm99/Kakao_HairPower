@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.util.List;
 
 @Slf4j
 @Service
@@ -57,4 +58,17 @@ public class UserService {
             log.error("❌ AI 서버 요청 실패: {}", e.getMessage(), e);
         }
     }
+
+    // ✅ 사용자 특징 조회 (userFeatures 반환)
+    public List<String> getUserFeatures(Long userId) {
+        log.info("📡 사용자 특징 조회 요청: userId={}", userId);
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("유효하지 않은 사용자 ID입니다."));
+
+        log.info("✅ userId={} 의 특징 조회 완료: {}", userId, user.getUserFeatures());
+
+        return user.getUserFeatures();
+    }
+
 }

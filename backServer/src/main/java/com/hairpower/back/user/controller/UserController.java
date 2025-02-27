@@ -3,12 +3,15 @@ package com.hairpower.back.user.controller;
 import com.hairpower.back.user.model.User;
 import com.hairpower.back.user.service.UserService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.util.List;
 
+@Slf4j
 @RestController
 @RequestMapping("/user")
 @RequiredArgsConstructor
@@ -24,6 +27,19 @@ public class UserController {
         User user = userService.createUser(gender, image);
         return ResponseEntity.ok(user);
     }
+
+
+    // ✅ 사용자 특징 조회 API
+    @GetMapping("/face/{userId}")
+    public ResponseEntity<List<String>> getUserFeatures(@PathVariable Long userId) {
+        log.info("📡 GET /face/{} 요청 수신", userId);
+
+        List<String> userFeatures = userService.getUserFeatures(userId);
+
+        return ResponseEntity.ok(userFeatures);
+    }
+
+
 
 //    // ✅ 유저 생성 후 AI 서버에 정보 보내기
 //    @PostMapping("/send-ai/{userId}")
